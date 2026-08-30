@@ -1,0 +1,39 @@
+{
+  "name": "quick-commerce-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-Store Scheduled-Delivery E-Commerce / Quick-Commerce Platform (PERN Stack)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:customer": "bun run --cwd apps/customer-pwa dev",
+    "dev:driver": "bun run --cwd apps/driver-pwa dev",
+    "dev:store-admin": "bun run --cwd apps/store-admin-pwa dev",
+    "dev:god-admin": "bun run --cwd apps/god-admin-pwa dev",
+    "dev:worker": "bun run --cwd apps/api worker",
+    "build": "bun run --cwd packages/shared build && bun run --cwd apps/api build && bun run --cwd apps/customer-pwa build && bun run --cwd apps/driver-pwa build && bun run --cwd apps/store-admin-pwa build && bun run --cwd apps/god-admin-pwa build",
+    "test": "bun test apps/api/tests",
+    "db:migrate": "bun run --cwd apps/api db:migrate",
+    "db:seed": "bun run --cwd apps/api db:seed"
+  },
+  "keywords": [
+    "quick-commerce",
+    "multi-store",
+    "scheduled-delivery",
+    "delivery-slots",
+    "batching",
+    "express",
+    "react",
+    "pwa",
+    "prisma",
+    "postgresql",
+    "redis",
+    "bullmq"
+  ],
+  "author": "QuickCommerce Core Team",
+  "license": "UNLICENSED"
+}

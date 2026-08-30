@@ -1,0 +1,130 @@
+services:
+  # ============================================================================
+  # 1. EXPRESS MODULAR MONOLITH API BACKEND
+  # ============================================================================
+  - type: web
+    name: quickcommerce-api
+    runtime: node
+    plan: standard
+    region: singapore
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../ui && bun run build && cd ../../apps/api && bun x prisma generate && bun run build
+    startCommand: cd apps/api && bun dist/server.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: quickcommerce-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: quickcommerce-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: HMAC_SECRET
+        generateValue: true
+      - key: TZ
+        value: Asia/Kolkata
+
+  # ============================================================================
+  # 2. BACKGROUND QUEUE & OUTBOX WORKER
+  # ============================================================================
+  - type: worker
+    name: quickcommerce-worker
+    runtime: node
+    plan: standard
+    region: singapore
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../../apps/api && bun x prisma generate && bun run build
+    startCommand: cd apps/api && bun dist/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: quickcommerce-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: quickcommerce-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: HMAC_SECRET
+        generateValue: true
+      - key: TZ
+        value: Asia/Kolkata
+
+  # ============================================================================
+  # 3. CUSTOMER PWA (Static Site)
+  # ============================================================================
+  - type: web
+    name: quickcommerce-customer-pwa
+    runtime: static
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../ui && bun run build && cd ../../apps/customer-pwa && bun run build
+    staticPublishPath: apps/customer-pwa/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ============================================================================
+  # 4. DRIVER PARTNER PWA (Static Site)
+  # ============================================================================
+  - type: web
+    name: quickcommerce-driver-pwa
+    runtime: static
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../ui && bun run build && cd ../../apps/driver-pwa && bun run build
+    staticPublishPath: apps/driver-pwa/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ============================================================================
+  # 5. STORE OPERATIONS PWA (Static Site)
+  # ============================================================================
+  - type: web
+    name: quickcommerce-store-admin-pwa
+    runtime: static
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../ui && bun run build && cd ../../apps/store-admin-pwa && bun run build
+    staticPublishPath: apps/store-admin-pwa/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ============================================================================
+  # 6. GLOBAL GOD ADMIN PWA (Static Site)
+  # ============================================================================
+  - type: web
+    name: quickcommerce-god-admin-pwa
+    runtime: static
+    buildCommand: bun install && cd packages/shared && bun run build && cd ../ui && bun run build && cd ../../apps/god-admin-pwa && bun run build
+    staticPublishPath: apps/god-admin-pwa/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# ============================================================================
+# DATABASES & INFRASTRUCTURE
+# ============================================================================
+databases:
+  - name: quickcommerce-postgres
+    plan: standard
+    region: singapore
+    databaseName: quickcommerce
+    user: qc_admin
+    postgresMajorVersion: 16
+
+redis:
+  - name: quickcommerce-redis
+    plan: standard
+    region: singapore
+    maxmemoryPolicy: noeviction

@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "paths": {
+      "@quickcommerce/shared": ["../shared/src/index.ts"],
+      "@quickcommerce/shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
