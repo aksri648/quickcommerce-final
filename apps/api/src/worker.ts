@@ -1,17 +1,13 @@
 import { Worker } from 'bullmq';
-import { config } from './config';
+import { getRedisConnectionOptions } from './redis/client';
 import { invoicesService } from './modules/invoices/invoices.service';
 import { notificationsService } from './modules/notifications/notifications.service';
 import { prisma } from './database/prisma';
 import { logger } from './middleware/request-tracker';
 
-const connection = {
-  host: new URL(config.REDIS_URL).hostname || 'localhost',
-  port: parseInt(new URL(config.REDIS_URL).port || '6379', 10),
-  maxRetriesPerRequest: null,
-};
+const connection = getRedisConnectionOptions();
 
-logger.info('🚀 Starting QuickCommerce BullMQ Background Workers...');
+logger.info('🚀 Starting QuickCommerce BullMQ Background Workers (Upstash / Redis)...');
 
 // 1. Order Events Worker
 export const orderEventsWorker = new Worker(

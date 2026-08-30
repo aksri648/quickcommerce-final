@@ -1,14 +1,10 @@
 import { Queue } from 'bullmq';
-import { config } from '../config';
+import { getRedisConnectionOptions } from '../redis/client';
 import { pino } from 'pino';
 
 const logger = pino({ name: 'bullmq-queues' });
 
-const connection = {
-  host: new URL(config.REDIS_URL).hostname || 'localhost',
-  port: parseInt(new URL(config.REDIS_URL).port || '6379', 10),
-  maxRetriesPerRequest: null,
-};
+const connection = getRedisConnectionOptions();
 
 export const defaultJobOptions = {
   attempts: 3,

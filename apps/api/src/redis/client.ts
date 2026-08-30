@@ -1,22 +1,49 @@
-import Redis from 'ioredis';
+import Redis, { RedisOptions } from 'ioredis';
 import { config } from '../config';
 import { pino } from 'pino';
 import { v4 as uuidv4 } from 'uuid';
 
 const logger = pino({ name: 'redis-client' });
 
+/**
+ * Parses any Redis URL (including Upstash Serverless rediss:// with TLS)
+ * and returns connection options compatible with ioredis and BullMQ.
+ */
+export function getRedisConnectionOptions(): RedisOptions {
+  const url = config.REDIS_URL;
+  const isTls = url.startsWith('rediss://');
+
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname || 'localhost',
+      port: parseInt(parsed.port || (isTls ? '6379' : '6379'), 10),
+      username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+      password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+      tls: isTls ? { rejectUnauthorized: false } : undefined,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      lazyConnect: true,
+      retryStrategy(times) {
+        return Math.min(times * 100, 3000);
+      },
+    };
+  } catch {
+    return {
+      maxRetriesPerRequest: null,
+      lazyConnect: true,
+    };
+  }
+}
+
 export const redis = new Redis(config.REDIS_URL, {
+  ...getRedisConnectionOptions(),
   maxRetriesPerRequest: 3,
-  retryStrategy(times) {
-    const delay = Math.min(times * 100, 3000);
-    return delay;
-  },
-  lazyConnect: true,
   enableOfflineQueue: false,
 });
 
 redis.on('connect', () => {
-  logger.info('Connected to Redis');
+  logger.info('Connected to Redis (Upstash / Cloud / Local)');
 });
 
 redis.on('error', (err) => {
@@ -64,7 +91,6 @@ export async function acquireDistributedLock(
     return { acquired, token, release };
   } catch (err) {
     logger.warn({ err, resource }, 'Distributed lock acquisition failed, proceeding cautiously');
-    // If Redis is unavailable, return acquired=true with no-op release to avoid hard blocking
     return {
       acquired: true,
       token,
