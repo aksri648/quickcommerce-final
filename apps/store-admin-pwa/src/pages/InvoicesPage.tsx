@@ -3,13 +3,13 @@ import { useStoreAdminAuth } from '../context/StoreAdminAuthContext';
 import { InvoiceDTO, OrderDTO } from '@quickcommerce/shared';
 import { apiRequest } from '../api/client';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, Button, formatCurrency, Skeleton, Modal } from '@quickcommerce/ui';
-import { FileText, Download, Printer } from 'lucide-react';
+import { FileText, Download, Printer, ExternalLink } from 'lucide-react';
 
 export const InvoicesPage: React.FC = () => {
   const { store } = useStoreAdminAuth();
   const [orders, setOrders] = useState<OrderDTO[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDTO | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
 
   useEffect(() => {
     async function loadInvoices() {
@@ -29,11 +29,15 @@ export const InvoicesPage: React.FC = () => {
 
   const handleViewInvoice = async (orderId: string) => {
     try {
-      const inv = await apiRequest<InvoiceDTO>(`/invoices/order/${orderId}`);
+      const inv = await apiRequest<any>(`/invoices/order/${orderId}`);
       setSelectedInvoice(inv);
     } catch (err: any) {
       alert(err?.message || 'Failed to fetch invoice');
     }
+  };
+
+  const handleDownloadInvoice = (orderId: string) => {
+    window.open(`/api/invoices/order/${orderId}/download`, '_blank');
   };
 
   return (
@@ -75,15 +79,27 @@ export const InvoicesPage: React.FC = () => {
                   <TableCell className="text-xs font-bold text-slate-800">{formatCurrency(Number(order.tax))}</TableCell>
                   <TableCell className="font-black text-slate-900">{formatCurrency(Number(order.total))}</TableCell>
                   <TableCell>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2.5 text-xs font-bold"
-                      leftIcon={<FileText className="h-3.5 w-3.5" />}
-                      onClick={() => handleViewInvoice(order.id)}
-                    >
-                      Tax Invoice
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2.5 text-xs font-bold"
+                        leftIcon={<FileText className="h-3.5 w-3.5" />}
+                        onClick={() => handleViewInvoice(order.id)}
+                      >
+                        Preview
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                        leftIcon={<Download className="h-3.5 w-3.5" />}
+                        onClick={() => handleDownloadInvoice(order.id)}
+                        title="Download / Print PDF"
+                      >
+                        PDF
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -99,7 +115,7 @@ export const InvoicesPage: React.FC = () => {
         title={`Tax Invoice: ${selectedInvoice?.invoiceNumber}`}
         maxWidth="lg"
       >
-        <div className="p-4 bg-white border border-slate-200 rounded-2xl space-y-4 text-xs">
+        <div className="p-5 bg-white border border-slate-200 rounded-2xl space-y-4 text-xs">
           <div className="flex justify-between items-start border-b pb-3">
             <div>
               <h3 className="text-base font-black text-slate-900">QuickBlink Commerce Pvt Ltd</h3>
@@ -114,21 +130,32 @@ export const InvoicesPage: React.FC = () => {
 
           <div className="space-y-1.5 py-2">
             <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span className="font-bold">{formatCurrency(Number(selectedInvoice?.subtotal || 0))}</span>
+              <span>Taxable Subtotal:</span>
+              <span className="font-bold">{formatCurrency(Number(selectedInvoice?.order?.subtotal || selectedInvoice?.amount || 0))}</span>
             </div>
             <div className="flex justify-between">
               <span>Tax (5% GST):</span>
-              <span className="font-bold">{formatCurrency(Number(selectedInvoice?.tax || 0))}</span>
+              <span className="font-bold">{formatCurrency(Number(selectedInvoice?.taxAmount || 0))}</span>
             </div>
             <div className="flex justify-between">
-              <span>Delivery Fee:</span>
-              <span className="font-bold">{formatCurrency(Number(selectedInvoice?.deliveryFee || 0))}</span>
+              <span>Delivery Partner Fee:</span>
+              <span className="font-bold">{Number(selectedInvoice?.order?.deliveryFee || 0) === 0 ? 'FREE' : formatCurrency(Number(selectedInvoice?.order?.deliveryFee || 0))}</span>
             </div>
             <div className="pt-2 border-t flex justify-between font-black text-sm text-slate-900">
               <span>Total Paid (Cash):</span>
-              <span className="text-emerald-800">{formatCurrency(Number(selectedInvoice?.total || 0))}</span>
+              <span className="text-emerald-800">{formatCurrency(Number(selectedInvoice?.amount || 0))}</span>
             </div>
+          </div>
+
+          <div className="pt-3 border-t flex justify-end gap-2">
+            <Button
+              variant="primary"
+              size="sm"
+              leftIcon={<Printer className="w-4 h-4" />}
+              onClick={() => handleDownloadInvoice(selectedInvoice.orderId)}
+            >
+              Print / Save PDF
+            </Button>
           </div>
         </div>
       </Modal>

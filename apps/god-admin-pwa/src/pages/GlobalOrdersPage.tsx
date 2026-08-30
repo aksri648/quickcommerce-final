@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { OrderDTO } from '@quickcommerce/shared';
 import { apiRequest } from '../api/client';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, StatusBadge, Button, formatCurrency, Skeleton } from '@quickcommerce/ui';
-import { Globe, Clock, Search, Filter } from 'lucide-react';
+import { Globe, Clock, Search, Filter, Download, FileText } from 'lucide-react';
 
 export const GlobalOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderDTO[]>([]);
@@ -30,6 +30,10 @@ export const GlobalOrdersPage: React.FC = () => {
     o.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.store?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDownloadInvoice = (orderId: string) => {
+    window.open(`/api/invoices/order/${orderId}/download`, '_blank');
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -60,6 +64,7 @@ export const GlobalOrdersPage: React.FC = () => {
                 <TableHead className="text-slate-400">Slot Window</TableHead>
                 <TableHead className="text-slate-400">COD Total</TableHead>
                 <TableHead className="text-slate-400">Status</TableHead>
+                <TableHead className="text-slate-400">Invoice</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,6 +79,15 @@ export const GlobalOrdersPage: React.FC = () => {
                   <TableCell className="font-black text-emerald-400">{formatCurrency(Number(order.total))}</TableCell>
                   <TableCell>
                     <StatusBadge status={order.status} />
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      onClick={() => handleDownloadInvoice(order.id)}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs flex items-center gap-1 transition"
+                      title="Download GST Invoice"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
                   </TableCell>
                 </TableRow>
               ))}

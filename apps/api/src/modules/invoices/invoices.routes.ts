@@ -1,7 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { invoicesService } from './invoices.service';
 import { authenticate } from '../../middleware/auth';
-import { requireRole } from '../../middleware/rbac';
 import { UserRole } from '@quickcommerce/shared';
 
 const router = Router();
@@ -15,6 +14,36 @@ router.get('/', authenticate, async (req: Request, res: Response, next: NextFunc
 
     const result = await invoicesService.listInvoices({ storeId, customerId, page, limit });
     return res.json({ success: true, data: result.invoices, meta: result.meta });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/order/:orderId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoice = await invoicesService.getInvoiceForOrder(req.params.orderId);
+    return res.json({ success: true, data: invoice });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/order/:orderId/download', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const html = await invoicesService.renderInvoiceHtml(req.params.orderId);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:id/download', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const invoice = await invoicesService.getInvoiceById(req.params.id);
+    const html = await invoicesService.renderInvoiceHtml(invoice.orderId);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.send(html);
   } catch (err) {
     next(err);
   }

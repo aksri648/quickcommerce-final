@@ -104,7 +104,16 @@ export const OrderDetailsPage: React.FC = () => {
         >
           <ArrowLeft className="h-4 w-4" /> All Orders
         </button>
-        <StatusBadge status={order.status} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.open(`/api/invoices/order/${order.id}/download`, '_blank')}
+            className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl border border-emerald-200 shadow-xs transition active:scale-95"
+            title="Download Tax Invoice"
+          >
+            <Download className="h-3.5 w-3.5" /> Invoice
+          </button>
+          <StatusBadge status={order.status} />
+        </div>
       </div>
 
       {/* Order Summary Header */}
@@ -379,6 +388,16 @@ export const OrderDetailsPage: React.FC = () => {
           <div className="pt-2.5 border-t border-slate-200 flex justify-between font-black text-base text-slate-900">
             <span>Total Payable (Cash on Delivery)</span>
             <span className="text-emerald-800">{formatCurrency(Number(order.total))}</span>
+          </div>
+
+          <div className="pt-3">
+            <button
+              onClick={() => window.open(`/api/invoices/order/${order.id}/download`, '_blank')}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-2xs"
+            >
+              <Download className="w-4 h-4 text-emerald-700" />
+              <span>Download Official Tax Invoice (GST PDF)</span>
+            </button>
           </div>
         </div>
       </div>
