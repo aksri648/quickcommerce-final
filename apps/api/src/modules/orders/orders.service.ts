@@ -111,7 +111,7 @@ export class OrdersService {
         const sp = storeProducts.find((s) => s.productId === item.productId);
         const inv = inventoryRecords.find((i) => i.productId === item.productId);
 
-        const available = inv ? inv.quantity - inv.reservedQuantity : 10; // Demo fallback if unseeded
+        const available = inv ? inv.quantity - inv.reservedQuantity : 0; // Fixed fallback to 0
         if (available < item.quantity) {
           throw new AppError(
             ErrorCodes.OUT_OF_STOCK,
@@ -152,13 +152,17 @@ export class OrdersService {
       const grandTotal = Math.round((subtotal - discount + tax + deliveryFee) * 100) / 100;
 
       // 6. Atomically reserve slot capacity
-      await tx.deliverySlot.update({
+      const updatedSlot = await tx.deliverySlot.update({
         where: { id: deliverySlotId },
         data: {
           bookedCount: { increment: 1 },
           version: { increment: 1 },
         },
       });
+
+      if (updatedSlot.bookedCount > updatedSlot.capacity) {
+        throw new AppError(ErrorCodes.SLOT_FULL, 'Selected delivery slot is fully booked. Please choose another slot.', 409);
+      }
 
       // 7. Atomically decrement inventory & record ledger movements
       for (const update of inventoryUpdates) {
@@ -184,10 +188,11 @@ export class OrdersService {
       }
 
       // 8. Generate Order Number & Raw OTP
-      const orderNumber = `QC-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomInt(1000, 9999)}`;
+      const orderNumber = `QC-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomInt(1000, 9999)}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
       const rawOtp = this.generate6DigitOtp();
       const otpHash = this.hashOtp(rawOtp);
-      const otpExpiresAt = new Date(Date.now() + config.OTP_EXPIRY_MINUTES * 60 * 1000);
+      // Ensure expiry is relative to expected delivery or use a stable time. Adding 24h as safe fallback if config is small.
+      const otpExpiresAt = new Date(Date.now() + (config.OTP_EXPIRY_MINUTES || 1440) * 60 * 1000);
 
       // 9. Create Order
       const order = await tx.order.create({
@@ -421,10 +426,13 @@ export class OrdersService {
       // Handle Cancellation (Stock and slot capacity rollback)
       if (targetStatus === OrderStatus.CANCELLED) {
         // Rollback slot count
-        await tx.deliverySlot.update({
-          where: { id: order.deliverySlotId },
-          data: { bookedCount: { decrement: 1 } },
-        });
+        const slot = await tx.deliverySlot.findUnique({ where: { id: order.deliverySlotId } });
+        if (slot && slot.bookedCount > 0) {
+          await tx.deliverySlot.update({
+            where: { id: order.deliverySlotId },
+            data: { bookedCount: { decrement: 1 } },
+          });
+        }
 
         // Restore inventory stock
         for (const item of order.items) {

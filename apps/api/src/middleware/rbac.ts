@@ -53,17 +53,21 @@ export function requireStoreScope(storeIdParamName: string = 'storeId') {
       return next();
     }
 
-    const targetStoreId =
+    let targetStoreId =
       req.params[storeIdParamName] ||
-      (req.query[storeIdParamName] as string) ||
+      (req.query[storeIdParamName]) ||
       req.body[storeIdParamName];
 
-    if (!targetStoreId) {
+    if (Array.isArray(targetStoreId)) {
+      targetStoreId = targetStoreId[0]; // Or reject, but selecting the first is safer than bypass
+    }
+
+    if (!targetStoreId || typeof targetStoreId !== 'string') {
       return res.status(400).json({
         success: false,
         error: {
           code: ErrorCodes.VALIDATION_ERROR,
-          message: `Store scope identifier '${storeIdParamName}' is missing in request`,
+          message: `Store scope identifier '${storeIdParamName}' is missing or invalid in request`,
         },
       });
     }

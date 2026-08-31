@@ -31,14 +31,17 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(
     cors({
-      origin: config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN.split(','),
-      credentials: true,
+      origin: config.CORS_ORIGIN === '*' ? '*' : config.CORS_ORIGIN.split(','),
+      credentials: config.CORS_ORIGIN !== '*',
     })
   );
 
   // Body parser & request tracking
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+  app.use(express.text({ limit: '2mb' }));
+  app.use(express.raw({ limit: '2mb' }));
   app.use(requestTracker);
   app.use(standardRateLimiter);
 

@@ -66,22 +66,25 @@ export class OTPService {
         throw new AppError(ErrorCodes.INVALID_OTP, 'No OTP generated for this order', 400);
       }
 
-      // 3. Idempotency: If already delivered, return success safely
-      if (order.status === OrderStatus.DELIVERED && order.deliveryOtp.verifiedAt) {
-        return {
-          success: true,
-          orderId: order.id,
-          orderNumber: order.orderNumber,
-          status: OrderStatus.DELIVERED,
-          message: 'Order already successfully delivered and verified',
-        };
+      // 3. Idempotency & double verification check
+      if (order.deliveryOtp.verifiedAt) {
+        if (order.status === OrderStatus.DELIVERED) {
+          return {
+            success: true,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            status: OrderStatus.DELIVERED,
+            message: 'Order already successfully delivered and verified',
+          };
+        }
+        throw new AppError(ErrorCodes.OTP_ALREADY_USED, 'OTP has already been verified', 400);
       }
 
       // 4. Verify driver ownership of this batch
-      if (order.deliveryBatch?.driverId !== driver.id) {
+      if (!order.deliveryBatch || order.deliveryBatch.driverId !== driver.id) {
         throw new AppError(
           ErrorCodes.FORBIDDEN,
-          'You are not the assigned driver for this order batch',
+          'You are not the assigned driver for this order',
           403
         );
       }
@@ -95,12 +98,22 @@ export class OTPService {
         );
       }
 
-      if (new Date() > order.deliveryOtp.expiresAt) {
+      // Allow 5 minutes clock drift
+      const now = new Date();
+      if (now.getTime() - 5 * 60000 > order.deliveryOtp.expiresAt.getTime()) {
         throw new AppError(ErrorCodes.OTP_EXPIRED, 'OTP has expired', 400);
       }
 
-      // 6. Compare Hash
-      if (order.deliveryOtp.otpHash !== submittedHash) {
+      // 6. Compare Hash with timing-safe comparison
+      const otpHashBuffer = Buffer.from(order.deliveryOtp.otpHash);
+      const submittedHashBuffer = Buffer.from(submittedHash);
+
+      let isValid = false;
+      if (otpHashBuffer.length === submittedHashBuffer.length) {
+        isValid = crypto.timingSafeEqual(otpHashBuffer, submittedHashBuffer);
+      }
+
+      if (!isValid) {
         // Increment attempt count
         await tx.deliveryOTP.update({
           where: { id: order.deliveryOtp.id },
@@ -115,8 +128,6 @@ export class OTPService {
       }
 
       // 7. Valid OTP! Mark consumed & update Order to DELIVERED
-      const now = new Date();
-
       await tx.deliveryOTP.update({
         where: { id: order.deliveryOtp.id },
         data: {

@@ -22,12 +22,26 @@ export class NotificationsService {
     });
   }
 
-  async getUserNotifications(userId: string) {
-    return await prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+  async getUserNotifications(userId: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+    const [notifications, total] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.notification.count({ where: { userId } })
+    ]);
+    return {
+      notifications,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      }
+    };
   }
 
   async markAsRead(notificationId: string, userId: string) {

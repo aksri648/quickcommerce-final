@@ -40,7 +40,7 @@ export class AnalyticsService {
       }),
     ]);
 
-    const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total), 0);
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const completedToday = todayOrders.filter((o) => o.status === OrderStatus.DELIVERED).length;
     const completionRate = todayOrders.length > 0 ? Math.round((completedToday / todayOrders.length) * 100) : 100;
 
@@ -123,7 +123,7 @@ export class AnalyticsService {
       }),
     ]);
 
-    const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total), 0);
+    const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
     const completedOrdersToday = todayOrders.filter((o) => o.status === OrderStatus.DELIVERED).length;
     const cancelledOrdersToday = todayOrders.filter((o) => o.status === OrderStatus.CANCELLED).length;
 

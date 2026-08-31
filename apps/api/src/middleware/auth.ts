@@ -33,10 +33,20 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     });
   }
 
-  const token = authHeader.split(' ')[1];
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer' || !parts[1]) {
+    return res.status(401).json({
+      success: false,
+      error: { code: ErrorCodes.UNAUTHORIZED, message: 'Malformed authentication token' },
+    });
+  }
+  const token = parts[1];
 
   try {
     const decoded = jwt.verify(token, config.JWT_SECRET) as any;
+    if (!decoded || (!decoded.id && !decoded.sub)) {
+      return res.status(401).json({ success: false, error: { code: ErrorCodes.UNAUTHORIZED, message: 'Invalid token payload' } });
+    }
     
     // Find or verify user in database
     const user = await prisma.user.findUnique({
@@ -60,25 +70,26 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     const storeId =
       user.storeStaff?.[0]?.storeId ||
       user.driverProfile?.storeId ||
-      decoded.storeId;
+      decoded.storeId ||
+      undefined;
 
     req.user = {
       id: user.id,
-      auth0Id: user.auth0Id,
-      email: user.email,
-      role: user.role as UserRole,
+      auth0Id: user.auth0Id || '',
+      email: user.email || '',
+      role: (user.role as UserRole) || UserRole.CUSTOMER,
       storeId,
     };
 
     next();
   } catch (err: any) {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: ErrorCodes.UNAUTHORIZED,
-        message: 'Invalid or expired authentication token',
-      },
-    });
+    if (err instanceof jwt.JsonWebTokenError || err instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({
+        success: false,
+        error: { code: ErrorCodes.UNAUTHORIZED, message: 'Invalid or expired authentication token' },
+      });
+    }
+    next(err);
   }
 }
 

@@ -5,7 +5,7 @@ import { AssignDriverSchema, DriverStatusUpdateSchema, CreateDriverSchema, Drive
 export class DriversController {
   async listDrivers(req: Request, res: Response, next: NextFunction) {
     try {
-      const storeId = (req.query.storeId as string) || req.user?.storeId;
+      const storeId = req.user?.role === UserRole.SUPER_ADMIN ? (req.query.storeId as string) : req.user?.storeId;
       const status = req.query.status as DriverStatus | undefined;
       const availableOnly = req.query.availableOnly === 'true';
 
@@ -42,7 +42,8 @@ export class DriversController {
         validated.driverId,
         req.user!.id,
         req.user!.role,
-        validated.expectedVersion
+        validated.expectedVersion,
+        req.user!.storeId
       );
       return res.json({ success: true, data: batch });
     } catch (err) {

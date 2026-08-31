@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 export class StoresService {
   async listStores(query: z.infer<typeof StoreFilterSchema>) {
-    const { page, limit, search, isActive, city } = query;
+    const { page = 1, limit = 20, search, isActive, city } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -111,7 +111,7 @@ export class StoresService {
       }
 
       // Optimistic concurrency check if version passed
-      if (data.version !== undefined && current.version !== data.version) {
+      if (data.expectedVersion !== undefined && current.version !== data.expectedVersion) {
         throw new AppError(
           ErrorCodes.CONCURRENT_MODIFICATION,
           'Store was modified concurrently by another user. Please refresh and retry.',

@@ -8,7 +8,7 @@ const ConfigSchema = z.object({
   PORT: z.coerce.number().default(4000),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/quickcommerce?schema=public'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
-  JWT_SECRET: z.string().default('quickcommerce-super-secret-jwt-dev-key-32chars!'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters long').default('quickcommerce-super-secret-jwt-dev-key-32chars!'),
   AUTH0_DOMAIN: z.string().optional(),
   AUTH0_AUDIENCE: z.string().optional(),
   B2_APPLICATION_KEY_ID: z.string().optional(),
@@ -18,7 +18,12 @@ const ConfigSchema = z.object({
   OTP_EXPIRY_MINUTES: z.coerce.number().default(60),
   CORS_ORIGIN: z.string().default('*'),
   LOG_LEVEL: z.string().default('info'),
-});
+}).refine(data => {
+  if (data.NODE_ENV === 'production' && data.JWT_SECRET === 'quickcommerce-super-secret-jwt-dev-key-32chars!') {
+    return false;
+  }
+  return true;
+}, { message: "Cannot use default JWT_SECRET in production" });
 
 const parsed = ConfigSchema.safeParse(process.env);
 

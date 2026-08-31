@@ -130,6 +130,11 @@ export class ProductsService {
         throw new AppError(ErrorCodes.CONCURRENT_MODIFICATION, `Product slug '${data.slug}' already exists`, 409);
       }
 
+      const category = await tx.category.findUnique({ where: { id: data.categoryId } });
+      if (!category) {
+        throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, `Category not found`, 404);
+      }
+
       const product = await tx.product.create({
         data: {
           ...data,
@@ -159,6 +164,13 @@ export class ProductsService {
       const current = await tx.product.findUnique({ where: { id } });
       if (!current) {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Product not found', 404);
+      }
+
+      if (data.slug && data.slug !== current.slug) {
+        const existing = await tx.product.findUnique({ where: { slug: data.slug } });
+        if (existing) {
+          throw new AppError(ErrorCodes.CONCURRENT_MODIFICATION, `Product slug '${data.slug}' already exists`, 409);
+        }
       }
 
       if (data.version !== undefined && current.version !== data.version) {

@@ -90,11 +90,11 @@ export async function acquireDistributedLock(
 
     return { acquired, token, release };
   } catch (err) {
-    logger.warn({ err, resource }, 'Distributed lock acquisition failed, proceeding cautiously');
+    logger.error({ err, resource }, 'Distributed lock acquisition failed due to Redis error');
     return {
-      acquired: true,
+      acquired: false,
       token,
-      release: async () => true,
+      release: async () => false,
     };
   }
 }

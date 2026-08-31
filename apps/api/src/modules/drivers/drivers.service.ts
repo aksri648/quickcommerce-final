@@ -123,7 +123,8 @@ export class DriversService {
     driverId: string,
     actorId: string,
     actorRole: UserRole,
-    expectedVersion?: number
+    expectedVersion?: number,
+    actorStoreId?: string
   ) {
     return await withTransactionRetry(async (tx) => {
       // 1. Lock batch
@@ -134,6 +135,10 @@ export class DriversService {
 
       if (!batch) {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Batch not found', 404);
+      }
+
+      if (actorRole !== UserRole.SUPER_ADMIN && actorStoreId && batch.storeId !== actorStoreId) {
+        throw new AppError(ErrorCodes.FORBIDDEN, 'Not authorized for this store', 403);
       }
 
       if (expectedVersion !== undefined && batch.version !== expectedVersion) {
@@ -165,7 +170,8 @@ export class DriversService {
       const conflictingBatch = driver.batches.find(
         (b) =>
           b.deliverySlot.date === batch.deliverySlot.date &&
-          b.deliverySlot.startTime === batch.deliverySlot.startTime
+          b.deliverySlot.startTime < batch.deliverySlot.endTime &&
+          b.deliverySlot.endTime > batch.deliverySlot.startTime
       );
 
       if (conflictingBatch) {
@@ -233,6 +239,7 @@ export class DriversService {
         where: { id: driverId },
         data: {
           status: DriverStatus.BUSY,
+          isAvailable: false,
           version: { increment: 1 },
         },
       });

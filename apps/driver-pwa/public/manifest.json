@@ -1,13 +1,13 @@
 {
-  "name": "QuickBlink - Rapid Grocery Delivery",
-  "short_name": "QuickBlink",
-  "description": "Multi-Store Scheduled Rapid Grocery Delivery Platform",
+  "name": "QuickBlink Driver Partner",
+  "short_name": "Driver Partner",
+  "description": "Scheduled batch delivery partner app for QuickBlink",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#0c831f",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/favicon.svg",

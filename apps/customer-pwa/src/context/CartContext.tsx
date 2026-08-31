@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { CartDTO, StoreDTO, ProductDTO } from '@quickcommerce/shared';
 import { apiRequest } from '../api/client';
 import { useAuth } from './AuthContext';
@@ -65,8 +65,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('qc_selected_store', JSON.stringify(store));
   };
 
+  const updateQueue = useRef<Promise<void>>(Promise.resolve());
+
   const addToCart = async (product: ProductDTO, quantity: number = 1) => {
     if (!selectedStore) return;
+    if (quantity < 1) throw new Error('Quantity must be greater than zero');
     setIsLoading(true);
     try {
       const updated = await apiRequest<CartDTO>('/cart/items', {
@@ -87,18 +90,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = async (cartItemId: string, quantity: number) => {
-    setIsLoading(true);
-    try {
-      const updated = await apiRequest<CartDTO>(`/cart/items/${cartItemId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ quantity }),
-      });
-      setCart(updated);
-    } catch (err) {
-      console.error('Failed to update quantity:', err);
-    } finally {
-      setIsLoading(false);
-    }
+    if (quantity < 1) return;
+    updateQueue.current = updateQueue.current.then(async () => {
+      setIsLoading(true);
+      try {
+        const updated = await apiRequest<CartDTO>(`/cart/items/${cartItemId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ quantity }),
+        });
+        setCart(updated);
+      } catch (err) {
+        console.error('Failed to update quantity:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    });
+    return updateQueue.current;
   };
 
   const clearCart = async () => {

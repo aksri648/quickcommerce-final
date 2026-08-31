@@ -99,19 +99,19 @@ export class InvoicesService {
    * Idempotent Invoice Generation
    */
   async generateInvoiceForOrder(orderId: string) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: true },
+    });
+
+    if (!order) {
+      throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Order not found', 404);
+    }
+
     return await withTransactionRetry(async (tx) => {
       const existing = await tx.invoice.findUnique({ where: { orderId } });
       if (existing) {
         return existing;
-      }
-
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { store: true },
-      });
-
-      if (!order) {
-        throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Order not found', 404);
       }
 
       const invoiceNumber = `INV-${order.orderNumber.replace('QC-', '')}-${crypto.randomInt(100, 999)}`;
@@ -155,8 +155,11 @@ export class InvoicesService {
 
     const subtotal = Number(order.subtotal);
     const tax = Number(order.tax);
-    const cgst = (tax / 2).toFixed(2);
-    const sgst = (tax / 2).toFixed(2);
+    const taxPaise = Math.round(tax * 100);
+    const cgstPaise = Math.round(taxPaise / 2);
+    const sgstPaise = taxPaise - cgstPaise;
+    const cgst = (cgstPaise / 100).toFixed(2);
+    const sgst = (sgstPaise / 100).toFixed(2);
     const deliveryFee = Number(order.deliveryFee);
     const total = Number(order.total);
     const formattedDate = new Date(order.createdAt).toLocaleDateString('en-IN', {
@@ -165,14 +168,23 @@ export class InvoicesService {
       year: 'numeric',
     });
 
+    const escapeHtml = (unsafe: string) => {
+      return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    };
+
     const itemsRows = order.items
       .map(
         (item: any, index: number) => `
         <tr>
           <td style="text-align: center;">${index + 1}</td>
           <td>
-            <strong>${item.productNameSnapshot}</strong>
-            <br/><span style="color: #64748b; font-size: 11px;">SKU: ${item.skuSnapshot} • ${item.unitSnapshot}</span>
+            <strong>${escapeHtml(item.productNameSnapshot || '')}</strong>
+            <br/><span style="color: #64748b; font-size: 11px;">SKU: ${escapeHtml(item.skuSnapshot || '')} • ${escapeHtml(item.unitSnapshot || '')}</span>
           </td>
           <td style="text-align: center;">${item.quantity}</td>
           <td style="text-align: right;">₹${Number(item.unitPrice).toFixed(2)}</td>

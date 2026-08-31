@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'QuickBlink Platform God Admin',
         short_name: 'Platform God',
@@ -16,6 +17,15 @@ export default defineConfig({
         theme_color: '#090d16',
         background_color: '#090d16',
         display: 'standalone',
+        orientation: 'any',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: '192x192 512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
     }),
   ],

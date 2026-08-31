@@ -65,8 +65,12 @@ export const batchingWorker = new Worker(
 
 const workers = [orderEventsWorker, invoiceWorker, notificationsWorker, batchingWorker];
 
-async function shutdownWorkers() {
-  logger.info('Shutting down background workers...');
+workers.forEach(w => {
+  w.on('error', err => logger.error({ err, worker: w.name }, 'Worker error'));
+});
+
+async function shutdownWorkers(signal?: string) {
+  logger.info(`Shutting down background workers due to ${signal || 'shutdown'}...`);
   for (const w of workers) {
     await w.close();
   }
@@ -74,5 +78,14 @@ async function shutdownWorkers() {
   process.exit(0);
 }
 
-process.on('SIGTERM', shutdownWorkers);
-process.on('SIGINT', shutdownWorkers);
+process.on('SIGTERM', () => shutdownWorkers('SIGTERM'));
+process.on('SIGINT', () => shutdownWorkers('SIGINT'));
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled Promise Rejection in worker');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught Exception in worker');
+  shutdownWorkers('uncaughtException');
+});

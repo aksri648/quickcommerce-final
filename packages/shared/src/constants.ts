@@ -19,7 +19,7 @@ export const VALID_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PREPARING]: [OrderStatus.READY_FOR_DISPATCH, OrderStatus.CANCELLED],
   [OrderStatus.READY_FOR_DISPATCH]: [OrderStatus.ASSIGNED_TO_BATCH, OrderStatus.CANCELLED],
   [OrderStatus.ASSIGNED_TO_BATCH]: [OrderStatus.OUT_FOR_DELIVERY, OrderStatus.READY_FOR_DISPATCH, OrderStatus.CANCELLED],
-  [OrderStatus.OUT_FOR_DELIVERY]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+  [OrderStatus.OUT_FOR_DELIVERY]: [OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.READY_FOR_DISPATCH],
   [OrderStatus.DELIVERED]: [],
   [OrderStatus.CANCELLED]: [],
 };

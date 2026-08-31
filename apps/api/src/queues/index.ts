@@ -22,6 +22,11 @@ export const notificationsQueue = new Queue('notifications', { connection, defau
 export const invoiceQueue = new Queue('invoice-generation', { connection, defaultJobOptions });
 export const analyticsQueue = new Queue('analytics', { connection, defaultJobOptions });
 
+const queues = [orderEventsQueue, batchingQueue, notificationsQueue, invoiceQueue, analyticsQueue];
+queues.forEach(q => {
+  q.on('error', err => logger.error({ err, queue: q.name }, 'Queue error'));
+});
+
 export async function addJobSafe(queue: Queue, name: string, data: any, jobId?: string) {
   try {
     return await queue.add(name, data, {

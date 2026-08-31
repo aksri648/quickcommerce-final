@@ -7,11 +7,16 @@ import { CartProvider } from './context/CartContext';
 import { App } from './App';
 import './index.css';
 
+if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+  window.location.replace(`https://${window.location.hostname}${window.location.pathname}${window.location.search}`);
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 5 * 60 * 1000,
     },
   },
 });

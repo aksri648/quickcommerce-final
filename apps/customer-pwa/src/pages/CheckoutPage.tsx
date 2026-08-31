@@ -95,6 +95,7 @@ export const CheckoutPage: React.FC = () => {
   }
 
   const handlePlaceOrder = async () => {
+    if (isSubmitting) return;
     if (!selectedStore || !selectedAddressId || !selectedSlotId) {
       setErrorMessage('Please select a delivery address and a delivery slot.');
       return;
@@ -147,7 +148,10 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handleCreateAddress = () => {
-    if (!newStreet || !newRecipient) return;
+    if (!newStreet || !newRecipient || !newPhone || !newApt || !newPincode) {
+      alert('Please fill all address fields.');
+      return;
+    }
     const newAddr: AddressDTO = {
       id: `addr-${Date.now()}`,
       customerId: user?.id || 'cust',

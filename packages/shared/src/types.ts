@@ -297,9 +297,9 @@ export interface AuditLogDTO {
   action: AuditAction;
   entityType: string;
   entityId: string;
-  oldValue?: any;
-  newValue?: any;
-  metadata?: any;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   ipAddress?: string | null;
   userAgent?: string | null;
   createdAt: string;
@@ -313,7 +313,7 @@ export interface NotificationDTO {
   type: string;
   channel: NotificationChannel;
   isRead: boolean;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 

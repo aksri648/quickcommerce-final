@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Sparkles,
   ShoppingBag,
+  Download,
 } from 'lucide-react';
 
 export const OrderDetailsPage: React.FC = () => {
@@ -78,8 +79,8 @@ export const OrderDetailsPage: React.FC = () => {
     try {
       const slotDateStr = order.deliverySlot.date || order.deliveryDate || currentTime.toISOString().split('T')[0];
       const [startH, startM] = (order.deliverySlot.startTime || '09:00').split(':').map(Number);
-      const slotStart = new Date(slotDateStr);
-      slotStart.setHours(startH, startM, 0, 0);
+      const [year, month, day] = slotDateStr.split('-').map(Number);
+      const slotStart = new Date(year, month - 1, day, startH, startM, 0, 0);
       return currentTime.getTime() >= slotStart.getTime();
     } catch {
       return true;
@@ -94,6 +95,24 @@ export const OrderDetailsPage: React.FC = () => {
     ? `${order.deliverySlot.startTime} – ${order.deliverySlot.endTime}`
     : '03:00 PM – 06:00 PM';
 
+  const handleDownloadInvoice = async () => {
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || '/api';
+      const token = localStorage.getItem('qc_token');
+      const response = await fetch(`${API_BASE}/invoices/order/${order.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Failed to fetch invoice');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to open invoice');
+    }
+  };
+
   return (
     <div className="pb-28 max-w-2xl mx-auto px-4 pt-3 space-y-4 animate-fade-in">
       {/* Top Navigation Bar */}
@@ -106,7 +125,7 @@ export const OrderDetailsPage: React.FC = () => {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => window.open(`/api/invoices/order/${order.id}/download`, '_blank')}
+            onClick={handleDownloadInvoice}
             className="flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl border border-emerald-200 shadow-xs transition active:scale-95"
             title="Download Tax Invoice"
           >
@@ -392,7 +411,7 @@ export const OrderDetailsPage: React.FC = () => {
 
           <div className="pt-3">
             <button
-              onClick={() => window.open(`/api/invoices/order/${order.id}/download`, '_blank')}
+              onClick={handleDownloadInvoice}
               className="w-full py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-98 shadow-2xs"
             >
               <Download className="w-4 h-4 text-emerald-700" />

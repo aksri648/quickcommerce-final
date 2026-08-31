@@ -96,7 +96,7 @@ export class CartService {
       const inv = await tx.inventory.findUnique({
         where: { storeId_productId: { storeId, productId } },
       });
-      const available = inv ? inv.quantity - inv.reservedQuantity : 10; // Default demo fallback if unseeded
+      const available = inv ? inv.quantity - inv.reservedQuantity : 0; // Default demo fallback removed for real stores
       if (available < quantity) {
         throw new AppError(ErrorCodes.OUT_OF_STOCK, 'Requested quantity exceeds available stock', 400);
       }
@@ -118,6 +118,10 @@ export class CartService {
             storeId,
           },
         });
+      }
+
+      if (quantity <= 0) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Quantity must be positive', 400);
       }
 
       // 4. Upsert cart item

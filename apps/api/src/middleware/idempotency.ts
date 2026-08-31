@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../database/prisma';
 import { ErrorCodes } from '@quickcommerce/shared';
+import { acquireDistributedLock } from '../redis/client';
 
 /**
  * Hash request body for payload integrity checking
@@ -24,7 +25,7 @@ function hashPayload(payload: any): string {
 export function idempotency(required: boolean = false) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const key = req.headers['idempotency-key'] as string;
-    const userId = req.user?.id || 'anonymous';
+    const userId = req.user?.id || null;
     const endpoint = `${req.method}:${req.baseUrl}${req.path}`;
 
     if (!key) {
@@ -44,13 +45,11 @@ export function idempotency(required: boolean = false) {
 
     try {
       // Check existing idempotency key
-      const existing = await prisma.idempotencyKey.findUnique({
+      const existing = await prisma.idempotencyKey.findFirst({
         where: {
-          userId_key_endpoint: {
-            userId,
-            key,
-            endpoint,
-          },
+          key,
+          endpoint,
+          userId: userId ?? undefined,
         },
       });
 
@@ -67,6 +66,36 @@ export function idempotency(required: boolean = false) {
 
         // Return the cached response
         return res.status(existing.responseStatus).json(existing.responseBody);
+      }
+
+      // Try to acquire lock to prevent race condition
+      const lockKey = userId
+        ? `idempotency:${userId}:${key}:${endpoint}`
+        : `idempotency:anon:${key}:${endpoint}`;
+      const lock = await acquireDistributedLock(lockKey, 30000); // 30s lock
+
+      if (!lock.acquired) {
+        return res.status(409).json({
+          success: false,
+          error: {
+            code: ErrorCodes.CONCURRENT_MODIFICATION,
+            message: 'A request with this idempotency key is already being processed',
+          },
+        });
+      }
+
+      // Recheck inside lock in case it was created while waiting
+      const existingInsideLock = await prisma.idempotencyKey.findFirst({
+        where: {
+          key,
+          endpoint,
+          userId: userId ?? undefined,
+        },
+      });
+
+      if (existingInsideLock) {
+        await lock.release();
+        return res.status(existingInsideLock.responseStatus).json(existingInsideLock.responseBody);
       }
 
       // Intercept res.json to capture response body
@@ -87,9 +116,14 @@ export function idempotency(required: boolean = false) {
                 expiresAt,
               },
             })
+            .finally(() => {
+              lock.release();
+            })
             .catch(() => {
               // Non-fatal if concurrent write happened
             });
+        } else {
+          lock.release();
         }
         return originalJson(body);
       };

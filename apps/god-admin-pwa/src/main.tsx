@@ -6,7 +6,19 @@ import { GodAdminAuthProvider } from './context/GodAdminAuthContext';
 import { App } from './App';
 import './index.css';
 
-const queryClient = new QueryClient();
+if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+  window.location.replace(`https://${window.location.hostname}${window.location.pathname}${window.location.search}`);
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

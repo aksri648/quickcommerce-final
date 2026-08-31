@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
     "outDir": "./dist",
     "paths": {
       "@quickcommerce/shared": ["../../packages/shared/src/index.ts"],

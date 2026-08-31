@@ -17,6 +17,15 @@ export class SlotsService {
    * Ensure standard delivery slots exist for a store and date, then calculate real-time status
    */
   async getOrGenerateSlotsForDate(storeId: string, dateStr: string) {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: DEFAULT_TIMEZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const kolkataDateStr = formatter.format(now);
+    const timeFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: DEFAULT_TIMEZONE, hour: '2-digit', minute: '2-digit', hour12: false });
+    const kolkataTimeStr = timeFormatter.format(now);
+
+    const isToday = dateStr === kolkataDateStr;
+    const isPastDate = dateStr < kolkataDateStr;
+
     // 1. Check existing slots
     let slots = await prisma.deliverySlot.findMany({
       where: { storeId, date: dateStr },
@@ -24,7 +33,7 @@ export class SlotsService {
     });
 
     // If none exist for this date, seed default 4 windows
-    if (slots.length === 0) {
+    if (slots.length === 0 && !isPastDate) {
       await withTransactionRetry(async (tx) => {
         for (const defaultSlot of DEFAULT_DELIVERY_SLOTS) {
           await tx.deliverySlot.upsert({
@@ -59,14 +68,6 @@ export class SlotsService {
     }
 
     // 2. Compute dynamic real-time slot status in Asia/Kolkata timezone
-    const now = new Date();
-    // Convert current time to Asia/Kolkata date and time
-    const kolkataDateStr = now.toLocaleDateString('en-CA', { timeZone: DEFAULT_TIMEZONE }); // YYYY-MM-DD
-    const kolkataTimeStr = now.toLocaleTimeString('en-GB', { timeZone: DEFAULT_TIMEZONE, hour: '2-digit', minute: '2-digit' }); // HH:mm
-
-    const isToday = dateStr === kolkataDateStr;
-    const isPastDate = dateStr < kolkataDateStr;
-
     return slots.map((slot) => {
       const availableCapacity = Math.max(0, slot.capacity - slot.bookedCount);
       let calculatedStatus: SlotStatus = slot.status;
@@ -142,12 +143,17 @@ export class SlotsService {
     slotId: string,
     data: z.infer<typeof UpdateSlotCapacitySchema>,
     actorId: string,
-    actorRole: UserRole
+    actorRole: UserRole,
+    actorStoreId?: string
   ) {
     return await withTransactionRetry(async (tx) => {
       const slot = await tx.deliverySlot.findUnique({ where: { id: slotId } });
       if (!slot) {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Delivery slot not found', 404);
+      }
+
+      if (actorRole !== UserRole.SUPER_ADMIN && actorStoreId && slot.storeId !== actorStoreId) {
+        throw new AppError(ErrorCodes.FORBIDDEN, 'Not authorized for this store', 403);
       }
 
       // Optimistic concurrency check
@@ -160,7 +166,7 @@ export class SlotsService {
       }
 
       // Invariant: Do not allow capacity to be reduced below current bookings
-      if (data.capacity < slot.bookedCount) {
+      if (data.capacity !== undefined && data.capacity < slot.bookedCount) {
         throw new AppError(
           ErrorCodes.VALIDATION_ERROR,
           `Cannot reduce slot capacity to ${data.capacity} because ${slot.bookedCount} orders are already booked for this slot.`,
@@ -171,7 +177,7 @@ export class SlotsService {
       const updated = await tx.deliverySlot.update({
         where: { id: slotId },
         data: {
-          capacity: data.capacity,
+          capacity: data.capacity ?? slot.capacity,
           bookingCutoffMinutes: data.bookingCutoffMinutes ?? slot.bookingCutoffMinutes,
           isActive: data.isActive ?? slot.isActive,
           version: { increment: 1 },

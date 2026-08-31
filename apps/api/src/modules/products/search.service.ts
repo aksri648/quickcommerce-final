@@ -133,12 +133,22 @@ function generateSemanticVector(text: string): number[] {
 
 export class SearchService {
   private db: AnyOrama | null = null;
-  private isInitialized = false;
+  private initPromise: Promise<void> | null = null;
 
-  /**
-   * Initializes the in-memory Orama hybrid search database with all catalog products
-   */
   async initIndex(): Promise<void> {
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this._initIndex();
+    try {
+      await this.initPromise;
+    } catch (e) {
+      this.initPromise = null;
+      throw e;
+    }
+  }
+
+  private async _initIndex(): Promise<void> {
+    if (this.isInitialized) return;
+
     try {
       this.db = await create({
         schema: {
@@ -155,21 +165,27 @@ export class SearchService {
 
       let products: any[] = [];
       try {
+        await prisma.$connect();
         products = await prisma.product.findMany({
           where: { isActive: true },
           include: { category: true },
         });
-      } catch {
-        // Fallback for test / offline mode with sample quick commerce products
-        products = [
-          { id: 'p1', name: 'Amul Taaza Fresh Milk', brand: 'Amul', category: { name: 'Dairy & Bread' }, description: 'Fresh pasteurized toned milk 500ml', unit: '500 ml', tags: ['milk', 'dairy', 'taaza'] },
-          { id: 'p2', name: 'Aashirvaad Superior Sharbati Atta', brand: 'Aashirvaad', category: { name: 'Atta, Rice & Dal' }, description: '100% whole wheat chakki atta', unit: '5 kg', tags: ['atta', 'wheat', 'flour'] },
-          { id: 'p3', name: 'Amul Masti Dahi Curd', brand: 'Amul', category: { name: 'Dairy & Bread' }, description: 'Probiotic fresh curd cup', unit: '400 g', tags: ['dahi', 'curd', 'yogurt'] },
-          { id: 'p4', name: 'Quaker Rolled Oats', brand: 'Quaker', category: { name: 'Breakfast & Cereals' }, description: '100% whole grain nutritious breakfast oats', unit: '1 kg', tags: ['oats', 'healthy breakfast', 'cereals'] },
-          { id: 'p5', name: 'Tata Tea Gold', brand: 'Tata', category: { name: 'Tea, Coffee & More' }, description: 'Exquisite blend of Assam tea with long leaves', unit: '500 g', tags: ['tea', 'chai', 'chai patti'] },
-          { id: 'p6', name: 'Fresh Farm Brown Eggs', brand: 'FarmFresh', category: { name: 'Dairy & Bread' }, description: 'Protein rich farm fresh eggs pack of 6', unit: '6 pcs', tags: ['eggs', 'protein', 'breakfast'] },
-          { id: 'p7', name: 'Lay\'s India\'s Magic Masala Chips', brand: 'Lay\'s', category: { name: 'Munchies & Snacks' }, description: 'Spicy ridged potato chips snack', unit: '50 g', tags: ['chips', 'midnight snacks', 'munchies'] },
-        ];
+      } catch (e: any) {
+        if (process.env.NODE_ENV === 'test') {
+          // Fallback for test / offline mode with sample quick commerce products
+          products = [
+            { id: 'p1', name: 'Amul Taaza Fresh Milk', brand: 'Amul', category: { name: 'Dairy & Bread' }, description: 'Fresh pasteurized toned milk 500ml', unit: '500 ml', tags: ['milk', 'dairy', 'taaza'] },
+            { id: 'p2', name: 'Aashirvaad Superior Sharbati Atta', brand: 'Aashirvaad', category: { name: 'Atta, Rice & Dal' }, description: '100% whole wheat chakki atta', unit: '5 kg', tags: ['atta', 'wheat', 'flour'] },
+            { id: 'p3', name: 'Amul Masti Dahi Curd', brand: 'Amul', category: { name: 'Dairy & Bread' }, description: 'Probiotic fresh curd cup', unit: '400 g', tags: ['dahi', 'curd', 'yogurt'] },
+            { id: 'p4', name: 'Quaker Rolled Oats', brand: 'Quaker', category: { name: 'Breakfast & Cereals' }, description: '100% whole grain nutritious breakfast oats', unit: '1 kg', tags: ['oats', 'healthy breakfast', 'cereals'] },
+            { id: 'p5', name: 'Tata Tea Gold', brand: 'Tata', category: { name: 'Tea, Coffee & More' }, description: 'Exquisite blend of Assam tea with long leaves', unit: '500 g', tags: ['tea', 'chai', 'chai patti'] },
+            { id: 'p6', name: 'Fresh Farm Brown Eggs', brand: 'FarmFresh', category: { name: 'Dairy & Bread' }, description: 'Protein rich farm fresh eggs pack of 6', unit: '6 pcs', tags: ['eggs', 'protein', 'breakfast'] },
+            { id: 'p7', name: 'Lay\'s India\'s Magic Masala Chips', brand: 'Lay\'s', category: { name: 'Munchies & Snacks' }, description: 'Spicy ridged potato chips snack', unit: '50 g', tags: ['chips', 'midnight snacks', 'munchies'] },
+          ];
+        } else {
+          logger.error({ error: e.message }, 'Failed to fetch products for search index');
+          throw e;
+        }
       }
 
       for (const p of products) {
@@ -180,6 +196,7 @@ export class SearchService {
       logger.info({ count: products.length }, '🔍 Orama Hybrid & Semantic Search index initialized');
     } catch (err: any) {
       logger.error({ error: err.message }, 'Failed to initialize Orama search index');
+      throw err;
     }
   }
 
@@ -221,10 +238,11 @@ export class SearchService {
         include: { category: true },
       });
 
-      if (!p) return;
-
       // Remove old entry if present
       await remove(this.db, productId).catch(() => {});
+
+      if (!p) return;
+
       if (p.isActive) {
         await this.indexProductDocument(p);
       }
@@ -350,7 +368,7 @@ export class SearchService {
     const enriched = products.map((p) => {
       const sp = (p as any).storeProducts?.[0];
       const inv = (p as any).inventory?.[0];
-      const availableQuantity = inv ? Math.max(0, inv.quantity - inv.reservedQuantity) : 10;
+      const availableQuantity = inv ? Math.max(0, inv.quantity - inv.reservedQuantity) : 0;
       const storePrice = sp ? Number(sp.price) : Number(p.basePrice || 90);
       const searchHit = hitMap.get(p.id);
       const searchScore = searchHit?.score ?? 0;

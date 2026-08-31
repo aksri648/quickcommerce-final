@@ -6,7 +6,7 @@ export class BatchesController {
   async listBatches(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await batchesService.listBatches({
-        storeId: (req.query.storeId as string) || req.user?.storeId,
+        storeId: req.user?.role === UserRole.SUPER_ADMIN ? (req.query.storeId as string) : req.user?.storeId,
         driverId: req.query.driverId as string | undefined,
         status: req.query.status as BatchStatus | undefined,
         slotId: req.query.slotId as string | undefined,
@@ -31,7 +31,7 @@ export class BatchesController {
   async createBatch(req: Request, res: Response, next: NextFunction) {
     try {
       const validated = CreateDeliveryBatchSchema.parse(req.body);
-      const batch = await batchesService.createBatch(validated, req.user!.id, req.user!.role);
+      const batch = await batchesService.createBatch(validated, req.user!.id, req.user!.role, req.user!.storeId);
       return res.status(201).json({ success: true, data: batch });
     } catch (err) {
       next(err);
@@ -40,7 +40,7 @@ export class BatchesController {
 
   async dispatchBatch(req: Request, res: Response, next: NextFunction) {
     try {
-      const batch = await batchesService.dispatchBatch(req.params.id, req.user!.id, req.user!.role);
+      const batch = await batchesService.dispatchBatch(req.params.id, req.user!.id, req.user!.role, req.user!.storeId);
       return res.json({ success: true, data: batch });
     } catch (err) {
       next(err);

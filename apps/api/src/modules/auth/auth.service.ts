@@ -8,6 +8,9 @@ export class AuthService {
    * Fast dev & demo login allowing client testing across all 5 roles
    */
   async devLogin(role: UserRole, email?: string, storeId?: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new AppError(ErrorCodes.UNAUTHORIZED as any, 'Dev login is disabled in production', 403);
+    }
     const targetEmail = email || DEMO_USERS[role]?.email || `demo-${role.toLowerCase()}@quickcommerce.dev`;
 
     let user = await prisma.user.findUnique({
@@ -38,6 +41,18 @@ export class AuthService {
         await prisma.customerProfile.create({
           data: { userId: user.id },
         });
+      } else if (role === UserRole.STORE_ADMIN || role === UserRole.STORE_STAFF) {
+        let targetStoreId = storeId;
+        if (!targetStoreId) {
+          const firstStore = await prisma.store.findFirst();
+          targetStoreId = firstStore?.id;
+        }
+        if (targetStoreId) {
+          await prisma.storeStaff.create({
+            data: { userId: user.id, storeId: targetStoreId, role }
+          });
+          user.storeStaff = [{ storeId: targetStoreId }] as any;
+        }
       }
     }
 

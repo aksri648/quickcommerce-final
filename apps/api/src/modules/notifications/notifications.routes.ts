@@ -6,8 +6,10 @@ const router = Router();
 
 router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const notifications = await notificationsService.getUserNotifications(req.user!.id);
-    return res.json({ success: true, data: notifications });
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const result = await notificationsService.getUserNotifications(req.user!.id, page, limit);
+    return res.json({ success: true, data: result.notifications, meta: result.meta });
   } catch (err) {
     next(err);
   }

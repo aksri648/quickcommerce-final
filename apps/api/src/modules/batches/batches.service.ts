@@ -98,15 +98,24 @@ export class BatchesService {
   async createBatch(
     data: z.infer<typeof CreateDeliveryBatchSchema>,
     actorId: string,
-    actorRole: UserRole
+    actorRole: UserRole,
+    actorStoreId?: string
   ) {
     const { storeId, deliverySlotId, orderIds } = data;
+
+    if (actorRole !== UserRole.SUPER_ADMIN && actorStoreId && storeId !== actorStoreId) {
+      throw new AppError(ErrorCodes.FORBIDDEN, 'Not authorized for this store', 403);
+    }
 
     return await withTransactionRetry(async (tx) => {
       // 1. Verify slot
       const slot = await tx.deliverySlot.findUnique({ where: { id: deliverySlotId } });
       if (!slot || slot.storeId !== storeId) {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Delivery slot not found', 404);
+      }
+
+      if (!orderIds || orderIds.length === 0) {
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Cannot create a batch with 0 orders', 400);
       }
 
       // 2. Fetch and lock candidate orders
@@ -147,20 +156,27 @@ export class BatchesService {
       // 4. Associate orders to batch & transition order status to ASSIGNED_TO_BATCH
       for (let i = 0; i < orders.length; i++) {
         const order = orders[i];
-        await tx.order.update({
-          where: { id: order.id },
+        
+        const updateResult = await tx.order.updateMany({
+          where: { id: order.id, deliveryBatchId: null },
           data: {
             deliveryBatchId: batch.id,
             status: OrderStatus.ASSIGNED_TO_BATCH,
-            timeline: {
-              create: {
-                fromStatus: order.status,
-                toStatus: OrderStatus.ASSIGNED_TO_BATCH,
-                reason: `Assigned to ${batch.batchNumber}`,
-                actorId,
-                actorRole,
-              },
-            },
+          },
+        });
+        
+        if (updateResult.count === 0) {
+          throw new AppError(ErrorCodes.BATCH_INVALID, `Order ${order.id} is already assigned to another batch`, 400);
+        }
+
+        await tx.orderTimeline.create({
+          data: {
+            orderId: order.id,
+            fromStatus: order.status,
+            toStatus: OrderStatus.ASSIGNED_TO_BATCH,
+            reason: `Assigned to ${batch.batchNumber}`,
+            actorId,
+            actorRole,
           },
         });
 
@@ -190,7 +206,7 @@ export class BatchesService {
   /**
    * Dispatch Batch: Marks batch and all member orders as OUT_FOR_DELIVERY
    */
-  async dispatchBatch(batchId: string, actorId: string, actorRole: UserRole) {
+  async dispatchBatch(batchId: string, actorId: string, actorRole: UserRole, actorStoreId?: string) {
     return await withTransactionRetry(async (tx) => {
       const batch = await tx.deliveryBatch.findUnique({
         where: { id: batchId },
@@ -201,11 +217,15 @@ export class BatchesService {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'Batch not found', 404);
       }
 
+      if (actorRole !== UserRole.SUPER_ADMIN && actorStoreId && batch.storeId !== actorStoreId) {
+        throw new AppError(ErrorCodes.FORBIDDEN, 'Not authorized for this store', 403);
+      }
+
       if (!batch.driverId) {
         throw new AppError(ErrorCodes.BATCH_INVALID, 'Cannot dispatch batch without an assigned driver', 400);
       }
 
-      if (batch.status === BatchStatus.OUT_FOR_DELIVERY) {
+      if (batch.status === BatchStatus.OUT_FOR_DELIVERY || batch.status === BatchStatus.DELIVERED || batch.status === BatchStatus.COMPLETED) {
         return batch; // Idempotent return
       }
 

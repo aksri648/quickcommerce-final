@@ -127,8 +127,11 @@ model User {
   driverProfile   Driver?
   orders          Order[]          @relation("CustomerOrders")
   addresses       Address[]
+  cart            Cart?
+  invoices        Invoice[]
   notifications   Notification[]
   auditLogs       AuditLog[]       @relation("ActorAuditLogs")
+  idempotencyKeys IdempotencyKey[]
 
   @@index([email])
   @@index([role])
@@ -175,6 +178,7 @@ model Store {
 
   @@index([code])
   @@index([city, isActive])
+  @@index([isActive])
 }
 
 model StoreStaff {
@@ -190,6 +194,7 @@ model StoreStaff {
 
   @@unique([userId, storeId])
   @@index([storeId])
+  @@index([userId])
 }
 
 model Driver {
@@ -211,6 +216,8 @@ model Driver {
   assignments   BatchDriverAssignment[]
 
   @@index([storeId, status, isAvailable])
+  @@index([storeId])
+  @@index([status])
 }
 
 model Category {
@@ -228,6 +235,7 @@ model Category {
 
   @@index([slug])
   @@index([displayOrder, isActive])
+  @@index([isActive])
 }
 
 model Product {
@@ -255,6 +263,7 @@ model Product {
   @@index([categoryId, isActive])
   @@index([brand])
   @@index([slug])
+  @@index([isActive])
 }
 
 model StoreProduct {
@@ -271,6 +280,7 @@ model StoreProduct {
 
   @@unique([storeId, productId])
   @@index([storeId, isAvailable])
+  @@index([productId])
 }
 
 model Inventory {
@@ -290,6 +300,7 @@ model Inventory {
 
   @@unique([storeId, productId])
   @@index([storeId, quantity])
+  @@index([productId])
 }
 
 model InventoryMovement {
@@ -307,6 +318,8 @@ model InventoryMovement {
   createdAt      DateTime              @default(now())
 
   @@index([inventoryId, createdAt])
+  @@index([actorId])
+  @@index([referenceType, referenceId])
 }
 
 model Address {
@@ -332,6 +345,7 @@ model Address {
 model Cart {
   id         String     @id @default(uuid())
   customerId String     @unique
+  customer   User       @relation(fields: [customerId], references: [id], onDelete: Cascade)
   storeId    String
   store      Store      @relation(fields: [storeId], references: [id], onDelete: Restrict)
   createdAt  DateTime   @default(now())
@@ -340,6 +354,7 @@ model Cart {
   items      CartItem[]
 
   @@index([customerId])
+  @@index([storeId])
 }
 
 model CartItem {
@@ -353,6 +368,8 @@ model CartItem {
   updatedAt DateTime @updatedAt
 
   @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
 }
 
 model DeliverySlot {
@@ -376,6 +393,7 @@ model DeliverySlot {
 
   @@unique([storeId, date, startTime, endTime])
   @@index([storeId, date, status])
+  @@index([date, status])
 }
 
 model DeliveryBatch {
@@ -403,6 +421,8 @@ model DeliveryBatch {
 
   @@index([storeId, deliverySlotId, status])
   @@index([driverId, status])
+  @@index([deliverySlotId])
+  @@index([status])
 }
 
 model DeliveryBatchOrder {
@@ -414,6 +434,7 @@ model DeliveryBatchOrder {
   createdAt DateTime      @default(now())
 
   @@index([batchId, sequence])
+  @@index([orderId])
 }
 
 model BatchDriverAssignment {
@@ -467,6 +488,8 @@ model Order {
   @@index([storeId, status, deliveryDate])
   @@index([deliverySlotId])
   @@index([deliveryBatchId])
+  @@index([status])
+  @@index([deliveryDate])
 }
 
 model OrderItem {
@@ -501,6 +524,7 @@ model OrderStatusHistory {
   createdAt DateTime     @default(now())
 
   @@index([orderId, createdAt])
+  @@index([actorId])
 }
 
 model DeliveryOTP {
@@ -516,6 +540,7 @@ model DeliveryOTP {
   createdAt    DateTime  @default(now())
 
   @@index([orderId, verifiedAt])
+  @@index([expiresAt])
 }
 
 model Invoice {
@@ -524,6 +549,7 @@ model Invoice {
   orderId       String   @unique
   order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId    String
+  customer      User     @relation(fields: [customerId], references: [id], onDelete: Restrict)
   storeId       String
   store         Store    @relation(fields: [storeId], references: [id], onDelete: Restrict)
   amount        Decimal  @db.Decimal(10, 2)
@@ -534,19 +560,21 @@ model Invoice {
   updatedAt     DateTime @updatedAt
 
   @@index([storeId, createdAt])
+  @@index([customerId])
+  @@index([orderId])
 }
 
 model File {
-  id          String   @id @default(uuid())
-  fileName    String
+  id           String   @id @default(uuid())
+  fileName     String
   originalName String
-  mimeType    String
-  sizeBytes   Int
-  storageKey  String   @unique
-  publicUrl   String
-  entityType  String?
-  entityId    String?
-  createdAt   DateTime @default(now())
+  mimeType     String
+  sizeBytes    Int
+  storageKey   String   @unique
+  publicUrl    String
+  entityType   String?
+  entityId     String?
+  createdAt    DateTime @default(now())
 
   @@index([entityType, entityId])
 }
@@ -571,6 +599,7 @@ model AuditLog {
   @@index([storeId, createdAt])
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
+  @@index([createdAt])
 }
 
 model Notification {
@@ -602,12 +631,14 @@ model OutboxEvent {
   createdAt     DateTime        @default(now())
 
   @@index([status, availableAt])
+  @@index([aggregateType, aggregateId])
 }
 
 model IdempotencyKey {
   id             String   @id @default(uuid())
   key            String
-  userId         String
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   endpoint       String
   requestHash    String
   responseStatus Int
@@ -617,4 +648,5 @@ model IdempotencyKey {
 
   @@unique([userId, key, endpoint])
   @@index([expiresAt])
+  @@index([userId])
 }

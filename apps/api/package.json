@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun --watch src/server.ts",
     "worker": "bun --watch src/worker.ts",
-    "build": "bun build src/server.ts --outdir ./dist --target node ; bun build src/worker.ts --outdir ./dist --target node",
+    "build": "bun build src/server.ts --outdir ./dist --target node && bun build src/worker.ts --outdir ./dist --target node",
     "start": "bun dist/server.js",
     "start:worker": "bun dist/worker.js",
     "db:generate": "bun prisma generate",

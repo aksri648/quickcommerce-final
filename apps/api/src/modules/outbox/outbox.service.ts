@@ -16,22 +16,28 @@ export class OutboxService {
    * Poll and process pending outbox events
    */
   async processPendingEvents() {
-    const pendingEvents = await prisma.outboxEvent.findMany({
-      where: {
-        status: OutboxStatus.PENDING,
-        availableAt: { lte: new Date() },
-        attempts: { lt: 5 },
-      },
-      take: 20,
-      orderBy: { createdAt: 'asc' },
+    const pendingEvents = await prisma.$transaction(async (tx) => {
+      const events = await tx.$queryRaw<any[]>`
+        SELECT * FROM "OutboxEvent"
+        WHERE "status" = 'PENDING'
+          AND "availableAt" <= NOW()
+          AND "attempts" < 5
+        ORDER BY "createdAt" ASC
+        LIMIT 20
+        FOR UPDATE SKIP LOCKED
+      `;
+
+      if (events.length > 0) {
+        await tx.outboxEvent.updateMany({
+          where: { id: { in: events.map((e) => e.id) } },
+          data: { status: 'PROCESSING', attempts: { increment: 1 } },
+        });
+      }
+      return events;
     });
 
     for (const event of pendingEvents) {
       try {
-        await prisma.outboxEvent.update({
-          where: { id: event.id },
-          data: { status: OutboxStatus.PROCESSING, attempts: { increment: 1 } },
-        });
 
         // Dispatch to BullMQ Queues based on event type
         switch (event.eventType) {
@@ -74,11 +80,12 @@ export class OutboxService {
         });
       } catch (err: any) {
         logger.error({ err: err.message, eventId: event.id }, 'Error processing outbox event');
-        const nextAttemptDelayMs = Math.min(60000, 1000 * Math.pow(2, event.attempts));
+        const newAttempts = event.attempts + 1;
+        const nextAttemptDelayMs = Math.min(60000, 5000 * Math.pow(2, newAttempts));
         await prisma.outboxEvent.update({
           where: { id: event.id },
           data: {
-            status: event.attempts >= 4 ? OutboxStatus.FAILED : OutboxStatus.PENDING,
+            status: newAttempts >= 4 ? OutboxStatus.FAILED : OutboxStatus.PENDING,
             availableAt: new Date(Date.now() + nextAttemptDelayMs),
             lastError: err?.message || String(err),
           },

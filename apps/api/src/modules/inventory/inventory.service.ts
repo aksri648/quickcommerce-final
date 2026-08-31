@@ -142,10 +142,10 @@ export class InventoryService {
           break;
 
         case InventoryMovementType.ADJUSTMENT:
-          if (quantity < 0) {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Absolute quantity cannot be negative', 400);
+          afterQuantity = beforeQuantity + quantity;
+          if (afterQuantity < 0) {
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Total quantity cannot be negative', 400);
           }
-          afterQuantity = quantity;
           break;
       }
 

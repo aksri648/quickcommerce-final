@@ -19,7 +19,7 @@ export class SlotsController {
   async updateSlotConfig(req: Request, res: Response, next: NextFunction) {
     try {
       const validated = UpdateSlotCapacitySchema.parse(req.body);
-      const slot = await slotsService.updateSlotConfig(req.params.id, validated, req.user!.id, req.user!.role);
+      const slot = await slotsService.updateSlotConfig(req.params.id, validated, req.user!.id, req.user!.role, req.user!.storeId);
       return res.json({ success: true, data: slot });
     } catch (err) {
       next(err);

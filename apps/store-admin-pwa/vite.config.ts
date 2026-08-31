@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'QuickBlink Store Operations',
         short_name: 'Store Console',
@@ -16,6 +17,15 @@ export default defineConfig({
         theme_color: '#0c831f',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'any',
+        icons: [
+          {
+            src: '/favicon.svg',
+            sizes: '192x192 512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
     }),
   ],

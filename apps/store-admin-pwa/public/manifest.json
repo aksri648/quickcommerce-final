@@ -1,11 +1,11 @@
 {
-  "name": "QuickBlink - Rapid Grocery Delivery",
-  "short_name": "QuickBlink",
-  "description": "Multi-Store Scheduled Rapid Grocery Delivery Platform",
+  "name": "QuickBlink Store Operations",
+  "short_name": "Store Console",
+  "description": "Dark store order fulfillment and batch management",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#0c831f",
   "icons": [
