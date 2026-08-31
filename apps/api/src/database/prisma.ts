@@ -37,13 +37,14 @@ export async function withTransactionRetry<T>(
       return await prisma.$transaction(async (tx) => {
         return await fn(tx);
       }, {
-        maxWait: 5000,
-        timeout: 10000,
+        maxWait: 15000,
+        timeout: 30000,
         isolationLevel: 'ReadCommitted',
       });
     } catch (err: any) {
       const isRetryable =
         err?.code === 'P2034' || // Transaction failed due to a write conflict or a deadlock
+        err?.code === 'P2002' || // Unique constraint failed (e.g. concurrent idempotency replay)
         err?.code === '40001' || // serialization_failure
         err?.code === '40P01';   // deadlock_detected
 

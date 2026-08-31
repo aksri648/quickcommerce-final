@@ -49,6 +49,19 @@ export class OrdersService {
     const { storeId, addressId, deliveryDate, deliverySlotId, items } = data;
 
     return await withTransactionRetry(async (tx) => {
+      if (idempotencyKey) {
+        const existing = await tx.order.findUnique({
+          where: { idempotencyKey },
+          include: {
+            items: true,
+            store: true,
+            deliverySlot: true,
+            invoice: true,
+          },
+        });
+        if (existing) return existing;
+      }
+
       // 1. Verify Store is active
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store || !store.isActive) {
@@ -92,26 +105,30 @@ export class OrdersService {
         throw new AppError(ErrorCodes.RESOURCE_NOT_FOUND, 'One or more products in your cart are no longer active', 400);
       }
 
-      // 5. Lock and Validate Inventory Rows in sorted order
-      const inventoryRecords = await tx.inventory.findMany({
-        where: {
-          storeId,
-          productId: { in: productIds },
-        },
-        orderBy: { productId: 'asc' },
-      });
+      // 5. Lock and Validate Inventory Rows in sorted order with SELECT FOR UPDATE
+      const inventoryRecords: any[] = [];
+      for (const pid of productIds) {
+        const lockedRows = await tx.$queryRaw<any[]>`
+          SELECT * FROM "Inventory"
+          WHERE "storeId" = ${storeId} AND "productId" = ${pid}
+          FOR UPDATE
+        `;
+        if (lockedRows && lockedRows.length > 0) {
+          inventoryRecords.push(lockedRows[0]);
+        }
+      }
 
       // Recalculate authoritative server-side pricing & verify stock
       let subtotal = 0;
       const orderItemsData: any[] = [];
-      const inventoryUpdates: { invId: string; newQty: number; reservedQty: number; qtyChange: number }[] = [];
+      const inventoryUpdates: { invId: string; reservedQty: number; qtyChange: number }[] = [];
 
       for (const item of sortedItems) {
         const product = products.find((p) => p.id === item.productId)!;
         const sp = storeProducts.find((s) => s.productId === item.productId);
         const inv = inventoryRecords.find((i) => i.productId === item.productId);
 
-        const available = inv ? inv.quantity - inv.reservedQuantity : 0; // Fixed fallback to 0
+        const available = inv ? Number(inv.quantity) - Number(inv.reservedQuantity) : 0;
         if (available < item.quantity) {
           throw new AppError(
             ErrorCodes.OUT_OF_STOCK,
@@ -139,8 +156,7 @@ export class OrdersService {
         if (inv) {
           inventoryUpdates.push({
             invId: inv.id,
-            newQty: inv.quantity - item.quantity,
-            reservedQty: inv.reservedQuantity,
+            reservedQty: Number(inv.reservedQuantity),
             qtyChange: item.quantity,
           });
         }
@@ -166,21 +182,25 @@ export class OrdersService {
 
       // 7. Atomically decrement inventory & record ledger movements
       for (const update of inventoryUpdates) {
-        await tx.inventory.update({
+        const updatedInv = await tx.inventory.update({
           where: { id: update.invId },
           data: {
-            quantity: update.newQty,
+            quantity: { decrement: update.qtyChange },
             version: { increment: 1 },
           },
         });
+
+        if (updatedInv.quantity < 0) {
+          throw new AppError(ErrorCodes.OUT_OF_STOCK, 'Insufficient inventory remaining', 409);
+        }
 
         await tx.inventoryMovement.create({
           data: {
             inventoryId: update.invId,
             type: InventoryMovementType.ORDER_RESERVATION,
             quantity: update.qtyChange,
-            beforeQuantity: update.newQty + update.qtyChange,
-            afterQuantity: update.newQty,
+            beforeQuantity: updatedInv.quantity + update.qtyChange,
+            afterQuantity: updatedInv.quantity,
             actorId: customerId,
             reason: `Order checkout reservation`,
           },
