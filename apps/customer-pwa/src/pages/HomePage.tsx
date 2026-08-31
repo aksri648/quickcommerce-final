@@ -38,10 +38,10 @@ export const HomePage: React.FC = () => {
     async function loadData() {
       setLoading(true);
       try {
-        const storeIdQuery = selectedStore ? `?storeId=${selectedStore.id}` : '';
+        const storeIdQuery = selectedStore ? `&storeId=${selectedStore.id}` : '';
         const [cats, products] = await Promise.all([
           apiRequest<CategoryDTO[]>('/products/categories'),
-          apiRequest<ProductDTO[]>(`/products${storeIdQuery}&limit=12`),
+          apiRequest<ProductDTO[]>(`/products?limit=12${storeIdQuery}`),
         ]);
 
         setCategories(cats);

@@ -38,9 +38,6 @@ export function createApp() {
     })
   );
 
-  // Mount Neon Managed Auth / Better Auth handler before standard body parsers
-  app.all('/api/auth/*', toNodeHandler(auth));
-
   // Body parser & request tracking
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
@@ -54,7 +51,10 @@ export function createApp() {
   app.use('/health', healthRoutes);
   app.use('/docs', docsRoutes);
 
+  // Mount Custom Auth routes first (dev-login, me), then Neon Managed Auth / Better Auth handler
   app.use('/api/auth', authRoutes);
+  app.all('/api/auth/*', toNodeHandler(auth));
+
   app.use('/api/stores', storesRoutes);
   app.use('/api/products', productsRoutes);
   app.use('/api/inventory', inventoryRoutes);

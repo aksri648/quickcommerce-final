@@ -5,26 +5,76 @@ import { Plus, Minus, ShoppingBag } from 'lucide-react';
 import { Button } from './button';
 
 export interface ProductCardProps {
-  product: ProductDTO;
+  product?: ProductDTO | any;
+  id?: string;
+  name?: string;
+  brand?: string;
+  unit?: string;
+  price?: number;
+  mrp?: number;
+  imageUrl?: string;
+  inStock?: boolean;
+  availableQuantity?: number;
+  lowStockThreshold?: number;
+  storePrice?: number;
+  basePrice?: number;
   quantityInCart?: number;
-  onAddToCart?: (product: ProductDTO) => void;
-  onUpdateQuantity?: (product: ProductDTO, newQty: number) => void;
-  onClick?: (product: ProductDTO) => void;
+  onAddToCart?: (product?: any) => void;
+  onUpdateQuantity?: (product: any, newQty: number) => void;
+  onIncrement?: () => void;
+  onDecrement?: () => void;
+  onClick?: (product?: any) => void;
   className?: string;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
-  product,
-  quantityInCart = 0,
-  onAddToCart,
-  onUpdateQuantity,
-  onClick,
-  className,
-}) => {
-  const isOutOfStock = (product.availableQuantity ?? 10) <= 0;
+export const ProductCard: React.FC<ProductCardProps> = (props) => {
+  const {
+    product: rawProduct,
+    quantityInCart = 0,
+    onAddToCart,
+    onUpdateQuantity,
+    onIncrement,
+    onDecrement,
+    onClick,
+    className,
+  } = props;
+
+  // Normalize product object from either product prop or flat props
+  const product: any = rawProduct || {
+    id: props.id || '',
+    name: props.name || '',
+    brand: props.brand || '',
+    unit: props.unit || '',
+    mrp: props.mrp ?? props.price ?? 0,
+    storePrice: props.price ?? props.storePrice ?? props.basePrice ?? 0,
+    basePrice: props.basePrice ?? props.price ?? 0,
+    imageUrl: props.imageUrl || '',
+    availableQuantity: props.availableQuantity ?? (props.inStock === false ? 0 : 10),
+    lowStockThreshold: props.lowStockThreshold ?? 5,
+  };
+
+  if (!product.id && !props.id && !product.name && !props.name) return null;
+
+  const isOutOfStock = props.inStock === false || (product.availableQuantity ?? 10) <= 0;
   const isLowStock = !isOutOfStock && (product.availableQuantity ?? 10) <= (product.lowStockThreshold ?? 5);
-  const effectivePrice = product.storePrice ?? product.basePrice;
-  const discountPercent = product.mrp > effectivePrice ? Math.round(((product.mrp - effectivePrice) / product.mrp) * 100) : 0;
+  const effectivePrice = props.price ?? product.storePrice ?? product.basePrice ?? 0;
+  const mrpPrice = props.mrp ?? product.mrp ?? effectivePrice;
+  const discountPercent = mrpPrice > effectivePrice ? Math.round(((mrpPrice - effectivePrice) / mrpPrice) * 100) : 0;
+
+  const handleAdd = () => {
+    if (onAddToCart) onAddToCart(product);
+    else if (onIncrement) onIncrement();
+  };
+
+  const handleDecrement = () => {
+    if (onUpdateQuantity) onUpdateQuantity(product, quantityInCart - 1);
+    else if (onDecrement) onDecrement();
+  };
+
+  const handleIncrement = () => {
+    if (onUpdateQuantity) onUpdateQuantity(product, quantityInCart + 1);
+    else if (onIncrement) onIncrement();
+  };
 
   return (
     <div
@@ -69,13 +119,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Product Details */}
       <div className="flex flex-col flex-1 cursor-pointer" onClick={() => onClick?.(product)}>
-        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-          {product.brand}
-        </span>
+        {product.brand && (
+          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            {product.brand}
+          </span>
+        )}
         <h4 className="text-xs font-semibold text-slate-800 line-clamp-2 mt-0.5 leading-snug">
           {product.name}
         </h4>
-        <span className="text-[11px] text-slate-500 mt-1">{product.unit}</span>
+        {product.unit && <span className="text-[11px] text-slate-500 mt-1">{product.unit}</span>}
 
         {isLowStock && (
           <span className="text-[10px] font-semibold text-amber-600 mt-1">
@@ -90,9 +142,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <span className="text-sm font-bold text-slate-900">
             {formatCurrency(effectivePrice)}
           </span>
-          {product.mrp > effectivePrice && (
+          {mrpPrice > effectivePrice && (
             <span className="text-[11px] text-slate-400 line-through">
-              {formatCurrency(product.mrp)}
+              {formatCurrency(mrpPrice)}
             </span>
           )}
         </div>
@@ -106,7 +158,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <div className="flex items-center gap-1.5 rounded-xl border border-emerald-600 bg-emerald-50 px-1 py-0.5">
               <button
                 type="button"
-                onClick={() => onUpdateQuantity?.(product, quantityInCart - 1)}
+                onClick={handleDecrement}
                 className="flex h-6 w-6 items-center justify-center rounded-lg bg-white text-emerald-700 shadow-xs hover:bg-emerald-100 transition-colors"
               >
                 <Minus className="h-3 w-3" />
@@ -116,7 +168,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </span>
               <button
                 type="button"
-                onClick={() => onUpdateQuantity?.(product, quantityInCart + 1)}
+                onClick={handleIncrement}
                 className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-xs hover:bg-emerald-700 transition-colors"
               >
                 <Plus className="h-3 w-3" />
@@ -126,7 +178,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onAddToCart?.(product)}
+              onClick={handleAdd}
               className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 font-semibold h-8 px-3 rounded-xl"
             >
               ADD
