@@ -200,18 +200,11 @@ export const CatalogPage: React.FC = () => {
               {products.map((p: any) => (
                 <div key={p.id} className="relative">
                   <ProductCard
-                    id={p.id}
-                    name={p.name}
-                    brand={p.brand}
-                    unit={p.unit}
-                    price={p.storePrice ?? p.basePrice}
-                    mrp={p.mrp}
-                    imageUrl={p.imageUrl}
-                    inStock={p.availableQuantity > 0}
+                    product={p}
                     quantityInCart={getQuantityInCart(p.id)}
-                    onAddToCart={() => addToCart(p, 1)}
-                    onIncrement={() => handleUpdateQty(p, getQuantityInCart(p.id) + 1)}
-                    onDecrement={() => handleUpdateQty(p, getQuantityInCart(p.id) - 1)}
+                    onAddToCart={(prod) => addToCart(prod || p, 1)}
+                    onUpdateQuantity={(prod, qty) => handleUpdateQty(prod || p, qty)}
+                    onClick={(prod) => navigate(`/product/${(prod || p).id}`)}
                   />
                   {p.matchType === 'SEMANTIC' && (
                     <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-xs flex items-center gap-0.5">

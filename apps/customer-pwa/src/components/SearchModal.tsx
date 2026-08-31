@@ -20,7 +20,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, store
   const [hasSearched, setHasSearched] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const { items, addItem, updateQuantity } = useCart();
+  const { cart, addToCart, updateQuantity } = useCart();
+  const items = cart?.items || [];
 
   useEffect(() => {
     if (isOpen) {
@@ -73,6 +74,15 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, store
   }, [searchTerm, storeId]);
 
   if (!isOpen) return null;
+
+  const handleUpdateQty = (product: any, newQty: number) => {
+    const cartItem = items.find((i) => i.productId === product.id);
+    if (cartItem) {
+      updateQuantity(cartItem.id, newQty);
+    } else if (newQty > 0) {
+      addToCart(product, newQty);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
@@ -175,32 +185,13 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, store
                     return (
                       <div key={product.id} className="relative">
                         <ProductCard
-                          id={product.id}
-                          name={product.name}
-                          brand={product.brand}
-                          unit={product.unit}
-                          price={product.storePrice}
-                          mrp={product.mrp}
-                          imageUrl={product.imageUrl}
-                          inStock={product.availableQuantity > 0}
+                          product={product}
                           quantityInCart={quantity}
-                          onAddToCart={() =>
-                            addItem({
-                              productId: product.id,
-                              name: product.name,
-                              brand: product.brand,
-                              unit: product.unit,
-                              price: product.storePrice,
-                              mrp: product.mrp,
-                              imageUrl: product.imageUrl,
-                              availableQuantity: product.availableQuantity,
-                            })
-                          }
-                          onIncrement={() => updateQuantity(product.id, quantity + 1)}
-                          onDecrement={() => updateQuantity(product.id, quantity - 1)}
+                          onAddToCart={(p) => addToCart(p || product, 1)}
+                          onUpdateQuantity={(p, qty) => handleUpdateQty(p || product, qty)}
                         />
                         {product.matchType === 'SEMANTIC' && (
-                          <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5">
+                          <div className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm flex items-center gap-0.5 pointer-events-none">
                             <Sparkles className="w-2.5 h-2.5" />
                             Semantic
                           </div>
