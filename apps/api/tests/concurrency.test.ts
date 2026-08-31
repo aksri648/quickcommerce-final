@@ -12,20 +12,22 @@ describe('High-Concurrency Stress & Invariant Tests', () => {
 
   beforeAll(async () => {
     try {
-      const store = await prisma.store.findFirst();
-      const product = await prisma.product.findFirst();
-      const slot = await prisma.deliverySlot.findFirst();
-      const customer = await prisma.user.findFirst({
-        where: { role: 'CUSTOMER' },
-        include: { addresses: true },
-      });
-
-      if (store && product && slot && customer) {
+      const store = await prisma.store.findFirst({ where: { isActive: true } });
+      if (store) {
         testStoreId = store.id;
-        testProductId = product.id;
-        testSlotId = slot.id;
-        testCustomerId = customer.id;
-        testAddressId = customer.addresses[0]?.id || '';
+        const product = await prisma.product.findFirst({ where: { isActive: true } });
+        const slot = await prisma.deliverySlot.findFirst({ where: { storeId: store.id, isActive: true } });
+        const customer = await prisma.user.findFirst({
+          where: { role: 'CUSTOMER' },
+          include: { addresses: true },
+        });
+
+        if (product && slot && customer) {
+          testProductId = product.id;
+          testSlotId = slot.id;
+          testCustomerId = customer.id;
+          testAddressId = customer.addresses[0]?.id || '';
+        }
       }
     } catch {
       // Database not connected in isolated environment
