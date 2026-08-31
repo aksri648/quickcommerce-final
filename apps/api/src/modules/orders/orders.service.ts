@@ -83,6 +83,8 @@ export class OrdersService {
         throw new AppError(ErrorCodes.SLOT_NOT_BOOKABLE, 'Selected delivery slot is unavailable', 400);
       }
 
+      const deliveryDate = slot.date;
+
       if (slot.bookedCount >= slot.capacity) {
         throw new AppError(ErrorCodes.SLOT_FULL, 'Selected delivery slot is fully booked. Please choose another slot.', 409);
       }

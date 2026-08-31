@@ -14,8 +14,10 @@ export class ProductsService {
     });
   }
 
-  async listProducts(query: z.infer<typeof ProductFilterSchema>) {
-    const { page, limit, search, categoryId, storeId, brand, inStockOnly } = query;
+  async listProducts(query: Partial<z.infer<typeof ProductFilterSchema>> = {}) {
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    const { search, categoryId, storeId, brand, inStockOnly } = query;
     const skip = (page - 1) * limit;
 
     const where: any = { isActive: true };

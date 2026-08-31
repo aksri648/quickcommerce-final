@@ -169,7 +169,7 @@ export class BatchesService {
           throw new AppError(ErrorCodes.BATCH_INVALID, `Order ${order.id} is already assigned to another batch`, 400);
         }
 
-        await tx.orderTimeline.create({
+        await tx.orderStatusHistory.create({
           data: {
             orderId: order.id,
             fromStatus: order.status,

@@ -85,7 +85,7 @@ export class CartService {
   }
 
   async addItem(customerId: string, storeId: string, productId: string, quantity: number) {
-    return await withTransactionRetry(async (tx) => {
+    await withTransactionRetry(async (tx) => {
       // 1. Verify store is active
       const store = await tx.store.findUnique({ where: { id: storeId } });
       if (!store || !store.isActive) {
@@ -141,13 +141,13 @@ export class CartService {
           quantity: { increment: quantity },
         },
       });
-
-      return await this.getCart(customerId);
     });
+
+    return await this.getCart(customerId);
   }
 
   async updateItemQuantity(customerId: string, cartItemId: string, quantity: number) {
-    return await withTransactionRetry(async (tx) => {
+    await withTransactionRetry(async (tx) => {
       const item = await tx.cartItem.findUnique({
         where: { id: cartItemId },
         include: { cart: true },
@@ -165,9 +165,9 @@ export class CartService {
           data: { quantity },
         });
       }
-
-      return await this.getCart(customerId);
     });
+
+    return await this.getCart(customerId);
   }
 
   async clearCart(customerId: string) {
