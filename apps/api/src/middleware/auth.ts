@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { fromNodeHeaders } from 'better-auth/node';
 import { auth } from '../auth';
 import { config } from '../config';
 import { prisma } from '../database/prisma';
 import { UserRole, ErrorCodes } from '@quickcommerce/shared';
+
+const JWKS = config.NEON_AUTH_JWKS_URL
+  ? createRemoteJWKSet(new URL(config.NEON_AUTH_JWKS_URL))
+  : null;
 
 export interface AuthenticatedUser {
   id: string;
@@ -24,7 +29,7 @@ declare global {
 
 /**
  * Neon Managed Auth / Better Auth Authentication Middleware
- * Resolves sessions from Better Auth cookies/headers or Bearer JWT tokens
+ * Resolves sessions from Better Auth cookies/headers or Bearer JWT tokens (with remote JWKS verification)
  */
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
@@ -59,30 +64,47 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1];
       if (token) {
-        try {
-          const decoded = jwt.verify(token, config.JWT_SECRET) as any;
-          if (decoded && (decoded.id || decoded.sub)) {
-            const user = await prisma.user.findUnique({
-              where: { id: decoded.id || decoded.sub },
-              include: {
-                storeStaff: { where: { isActive: true } },
-                driverProfile: true,
-              },
-            });
+        let decodedPayload: any = null;
 
-            if (user && user.isActive) {
-              req.user = {
-                id: user.id,
-                auth0Id: user.auth0Id || '',
-                email: user.email || '',
-                role: (user.role as UserRole) || UserRole.CUSTOMER,
-                storeId: user.storeStaff?.[0]?.storeId || user.driverProfile?.storeId || decoded.storeId,
-              };
-              return next();
-            }
+        // A. Try verifying via Neon Auth JWKS public key set
+        if (JWKS) {
+          try {
+            const { payload } = await jwtVerify(token, JWKS);
+            decodedPayload = payload;
+          } catch {
+            // Not a JWKS token or JWKS verification failed
           }
-        } catch {
-          // Token expired or invalid
+        }
+
+        // B. Fallback to local JWT_SECRET verification
+        if (!decodedPayload) {
+          try {
+            decodedPayload = jwt.verify(token, config.JWT_SECRET) as any;
+          } catch {
+            // Invalid token
+          }
+        }
+
+        if (decodedPayload && (decodedPayload.id || decodedPayload.sub)) {
+          const userId = decodedPayload.id || decodedPayload.sub;
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+              storeStaff: { where: { isActive: true } },
+              driverProfile: true,
+            },
+          });
+
+          if (user && user.isActive) {
+            req.user = {
+              id: user.id,
+              auth0Id: user.auth0Id || '',
+              email: user.email || (decodedPayload.email as string) || '',
+              role: (user.role as UserRole) || (decodedPayload.role as UserRole) || UserRole.CUSTOMER,
+              storeId: user.storeStaff?.[0]?.storeId || user.driverProfile?.storeId || decodedPayload.storeId,
+            };
+            return next();
+          }
         }
       }
     }
