@@ -48,7 +48,7 @@ export class ProductsService {
     const mappedProducts = products.map((p) => {
       const sp = (p as any).storeProducts?.[0];
       const inv = (p as any).inventory?.[0];
-      const availableQuantity = inv ? Math.max(0, inv.quantity - inv.reservedQuantity) : 10;
+      const availableQuantity = inv ? Math.max(0, inv.quantity - inv.reservedQuantity) : 0;
       const storePrice = sp ? Number(sp.price) : Number(p.basePrice);
 
       return {

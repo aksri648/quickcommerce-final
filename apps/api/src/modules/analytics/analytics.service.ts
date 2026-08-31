@@ -34,9 +34,8 @@ export class AnalyticsService {
         where: { storeId },
         select: { quantity: true, reservedQuantity: true, lowStockThreshold: true },
       }),
-      prisma.order.findMany({
+      prisma.order.count({
         where: { storeId },
-        select: { status: true },
       }),
     ]);
 
@@ -73,7 +72,7 @@ export class AnalyticsService {
       lowStockCount,
       outOfStockCount,
       completionRate,
-      totalLifetimeOrders: allOrders.length,
+      totalLifetimeOrders: allOrders,
     };
   }
 
@@ -101,7 +100,13 @@ export class AnalyticsService {
       prisma.driver.count(),
       prisma.order.findMany({
         where: { deliveryDate: today },
-        include: { store: true, deliverySlot: true },
+        select: {
+          status: true,
+          total: true,
+          deliverySlot: {
+            select: { startTime: true, endTime: true },
+          },
+        },
       }),
       prisma.deliveryBatch.count({
         where: { status: { in: [BatchStatus.READY, BatchStatus.BATCHED, BatchStatus.DRIVER_ASSIGNED] } },
