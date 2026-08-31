@@ -15,9 +15,11 @@
     "test": "bun test tests"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.5.0-beta",
     "@orama/orama": "^3.1.18",
     "@prisma/client": "^5.19.0",
     "@quickcommerce/shared": "workspace:*",
+    "better-auth": "^1.7.2",
     "bullmq": "^5.12.14",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

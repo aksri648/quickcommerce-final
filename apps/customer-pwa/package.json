@@ -9,6 +9,7 @@
     "preview": "vite preview --port 3000"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.5.0-beta",
     "@quickcommerce/shared": "workspace:*",
     "@quickcommerce/ui": "workspace:*",
     "@tanstack/react-query": "^5.56.2",

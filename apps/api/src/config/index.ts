@@ -14,6 +14,7 @@ const ConfigSchema = z.object({
   B2_APPLICATION_KEY_ID: z.string().optional(),
   B2_APPLICATION_KEY: z.string().optional(),
   B2_BUCKET_NAME: z.string().optional(),
+  NEON_AUTH_BASE_URL: z.string().optional(),
   OTP_SECRET_SALT: z.string().default('dev-otp-salt-quickcommerce-2026'),
   OTP_EXPIRY_MINUTES: z.coerce.number().default(60),
   CORS_ORIGIN: z.string().default('*'),

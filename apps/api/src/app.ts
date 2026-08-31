@@ -4,6 +4,8 @@ import cors from 'cors';
 import { requestTracker } from './middleware/request-tracker';
 import { standardRateLimiter } from './middleware/rate-limiter';
 import { errorHandler } from './middleware/error-handler';
+import { toNodeHandler } from 'better-auth/node';
+import { auth } from './auth';
 import { config } from './config';
 
 // Module Routes
@@ -35,6 +37,9 @@ export function createApp() {
       credentials: config.CORS_ORIGIN !== '*',
     })
   );
+
+  // Mount Neon Managed Auth / Better Auth handler before standard body parsers
+  app.all('/api/auth/*', toNodeHandler(auth));
 
   // Body parser & request tracking
   app.set('trust proxy', 1);
